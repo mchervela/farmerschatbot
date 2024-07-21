@@ -1,0 +1,59 @@
+# Requirements
+# !pip install google-api-python-client>=2.100.0
+# !pip show langchain-google-genai
+# !pip install -U langchain-google-community
+# !pip install langchain-google-genai
+# !pip install --upgrade pip
+
+# Imports
+from datetime import datetime
+import os
+
+import google.generativeai as genai
+import requests
+from bs4 import BeautifulSoup
+from langchain_core.tools import Tool
+from langchain_google_community import GoogleSearchAPIWrapper
+from langchain_google_genai import GoogleGenerativeAI, ChatGoogleGenerativeAI
+
+os.environ["GOOGLE_API_KEY"] = "AIzaSyDRjg0J81weyt7pbI1f-vqgPM658YbkNdw"
+os.environ["GOOGLE_CSE_ID"] = "7433e209480fb4be6"
+
+class LMS:
+    def __init__(self,llm="GEMINI"):
+        self.0=llm
+        self.search = GoogleSearchAPIWrapper()
+
+    def get_weather_info(self, place="Warangal", prompt=None):
+        tool = Tool(
+            name="google_search",
+            description="Search Google for recent results.",
+            func=self.search.run,
+        )
+        wea_info = tool.run(f'Telangana {place} weather for next 3 days')
+        
+        if prompt is None:
+            prompt= f"""
+            convert the below weather information in a given format:
+            format:
+            date: {datetime.now().date()}, 
+            rainfall probability: <Percentage>
+
+            weather information : {wea_info}
+            """
+        print(f"Formatted prompt:\n{prompt}")
+
+        if self.llm=="GEMINI":
+            # genai.configure(api_key='AIzaSyDRjg0J81weyt7pbI1f-vqgPM658YbkNdw')
+            genai.configure(api_key='AIzaSyAwTrLqf_Kpq4jvXDOtls9EqpkjKzCGlu0')
+            model = genai.GenerativeModel('gemini-pro')
+            output = model.generate_content(prompt)    
+
+        return output
+
+lms = LMS(llm="GEMINI")
+place = input("Name an Indian City: ")
+output = lms.get_weather_info(place)
+
+# Print the output
+print(f"Output:\n{outputmumbai}")

@@ -1,59 +1,106 @@
-# Requirements
-# !pip install google-api-python-client>=2.100.0
-# !pip show langchain-google-genai
-# !pip install -U langchain-google-community
-# !pip install langchain-google-genai
-# !pip install --upgrade pip
-
-# Imports
-from datetime import datetime
-import os
-
-import google.generativeai as genai
+import streamlit as st
 import requests
 from bs4 import BeautifulSoup
-from langchain_core.tools import Tool
-from langchain_google_community import GoogleSearchAPIWrapper
-from langchain_google_genai import GoogleGenerativeAI, ChatGoogleGenerativeAI
+import google.generativeai as genai
 
-os.environ["GOOGLE_API_KEY"] = "AIzaSyDRjg0J81weyt7pbI1f-vqgPM658YbkNdw"
-os.environ["GOOGLE_CSE_ID"] = "7433e209480fb4be6"
+# Configure API key for Google Generative AI
+genai.configure(api_key="AIzaSyAwTrLqf_Kpq4jvXDOtls9EqpkjKzCGlu0")
 
-class LMS:
-    def __init__(self,llm="GEMINI"):
-        self.0=llm
-        self.search = GoogleSearchAPIWrapper()
+# CSS styling for chat messages
+css = '''
+<style>
+.chat-message {
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+    display: flex;
+}
+.chat-message.user {
+    background-color: #2b313e;
+}
+.chat-message.bot {
+    background-color: #475063;
+}
+.chat-message .avatar {
+  width: 20%;
+}
+.chat-message .avatar img {
+  max-width: 78px;
+  max-height: 78px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.chat-message .message {
+  width: 85%;
+  padding: 0 1.25rem;
+  color: #fff;
+}
+</style>
+'''
+st.write(css, unsafe_allow_html=True)
 
-    def get_weather_info(self, place="Warangal", prompt=None):
-        tool = Tool(
-            name="google_search",
-            description="Search Google for recent results.",
-            func=self.search.run,
-        )
-        wea_info = tool.run(f'Telangana {place} weather for next 3 days')
-        
-        if prompt is None:
-            prompt= f"""
-            convert the below weather information in a given format:
-            format:
-            date: {datetime.now().date()}, 
-            rainfall probability: <Percentage>
+# Define user and bot templates
+user_template = '''
+<div class="chat-message user">
+    <div class="avatar">
+        <img src="https://resizing.flixster.com/ocuc8yjm8Fu5UK5Ze8lbdp58m9Y=/300x300/v2/https://flxt.tmsimg.com/assets/p11759522_i_h9_aa.jpg">
+    </div>    
+    <div class="message">{{MSG}}</div>
+</div>
+'''
 
-            weather information : {wea_info}
-            """
-        print(f"Formatted prompt:\n{prompt}")
+bot_template = '''
+<div class="chat-message bot">
+    <div class="avatar">
+        <img src="https://www.shutterstock.com/image-vector/nerd-robot-vector-illustration-version-260nw-2126944997.jpg">
+    </div>
+    <div class="message">{{MSG}}</div>
+</div>
+'''
 
-        if self.llm=="GEMINI":
-            # genai.configure(api_key='AIzaSyDRjg0J81weyt7pbI1f-vqgPM658YbkNdw')
-            genai.configure(api_key='AIzaSyAwTrLqf_Kpq4jvXDOtls9EqpkjKzCGlu0')
-            model = genai.GenerativeModel('gemini-pro')
-            output = model.generate_content(prompt)    
+# Function to scrape data from Telangana Agriculture Department website
+def scrape_agri_telangana():
+    url = "https://agri.telangana.gov.in/content.php?U=19"
+    response = requests.get(url)
+    soup = BeautifulSoup(response.content, "html.parser")
+    data = soup.find_all("div", class_="innercontent")
 
-        return output
+    # Extract relevant information from the webpage (example)
+    # Modify this part based on the specific data you want to extract
+    if data:
+        content = data[0].get_text().strip()
+        return content
+    else:
+        return "No data found"
 
-lms = LMS(llm="GEMINI")
-place = input("Name an Indian City: ")
-output = lms.get_weather_info(place)
+# Streamlit app title
+st.title("Farmers Chatbot")
 
-# Print the output
-print(f"Output:\n{outputmumbai}")
+# Accept user input for chat
+query = st.text_input("Ask a question about farming:")
+
+# Execute response logic when user clicks 'Execute' button
+if st.button("Execute") and query:
+    with st.spinner('Generating response...'):
+        try:
+            # Fetch data from Telangana Agriculture Department website
+            agriculture_info = scrape_agri_telangana()
+
+            # Initialize GenerativeModel for chat
+            model = genai.GenerativeModel('models/gemini-pro')
+
+            # Start chat session and get response
+            chat = model.start_chat()
+            response = chat.send_message(query)
+            answer = response.text
+
+            # Display user query and chatbot's answer
+            st.write(user_template.replace("{{MSG}}", query), unsafe_allow_html=True)
+            st.write(bot_template.replace("{{MSG}}", answer), unsafe_allow_html=True)
+            st.write("")
+            st.write("Here's some information from Telangana Agriculture Department:")
+            st.write(agriculture_info)
+
+        except Exception as e:
+            st.error(f"An error occurred: {str(e)}")
+
